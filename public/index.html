@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0a0a0a">
+  <title>Forensic Nutrition</title>
+  <style>
+    :root {
+      --bg-primary: #0a0a0a;
+      --bg-card: #1a1a1a;
+      --bg-elevated: #252525;
+      --text-primary: #ffffff;
+      --text-secondary: #888888;
+      --text-muted: #555555;
+      --accent: #22c55e;
+      --accent-dim: #166534;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --info: #3b82f6;
+      --border: #333333;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      padding: 20px;
+      padding-bottom: 100px;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+
+    .header h1 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      letter-spacing: -0.5px;
+    }
+
+    .date {
+      color: var(--text-secondary);
+      font-size: 0.875rem;
+    }
+
+    .card {
+      background: var(--bg-card);
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 16px;
+      border: 1px solid var(--border);
+    }
+
+    .card-title {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-secondary);
+      margin-bottom: 12px;
+    }
+
+    .calorie-display {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .calorie-range {
+      font-size: 2.5rem;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .calorie-unit {
+      color: var(--text-secondary);
+      font-size: 1rem;
+    }
+
+    .calorie-low {
+      color: var(--accent);
+    }
+
+    .calorie-high {
+      color: var(--warning);
+    }
+
+    .calorie-separator {
+      color: var(--text-secondary);
+      font-size: 1.5rem;
+      margin: 0 4px;
+    }
+
+    .macros-row {
+      display: flex;
+      gap: 16px;
+      margin-top: 16px;
+      flex-wrap: wrap;
+    }
+
+    .macro-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-width: 60px;
+    }
+
+    .macro-value {
+      font-size: 1.25rem;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .macro-label {
+      font-size: 0.625rem;
+      text-transform: uppercase;
+      color: var(--text-secondary);
+      letter-spacing: 0.5px;
+    }
+
+    .macro-protein { color: var(--info); }
+    .macro-carbs { color: var(--warning); }
+    .macro-sugar { color: #f472b6; }
+    .macro-fat { color: #a78bfa; }
+
+    .meals-count {
+      color: var(--text-secondary);
+      font-size: 0.875rem;
+      margin-top: 8px;
+    }
+
+    .meal-list {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .meal-entry {
+      background: var(--bg-elevated);
+      border-radius: 12px;
+      padding: 16px;
+      position: relative;
+    }
+
+    .meal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 12px;
+    }
+
+    .meal-time {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+    }
+
+    .meal-calories {
+      text-align: right;
+    }
+
+    .meal-cal-value {
+      font-size: 1.25rem;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .meal-macros {
+      display: flex;
+      gap: 8px;
+      font-size: 0.7rem;
+      color: var(--text-secondary);
+      margin-top: 4px;
+    }
+
+    .meal-macros span {
+      padding: 2px 6px;
+      background: var(--bg-card);
+      border-radius: 4px;
+    }
+
+    .confidence-badge {
+      display: inline-block;
+      font-size: 0.625rem;
+      text-transform: uppercase;
+      padding: 2px 6px;
+      border-radius: 4px;
+      margin-left: 8px;
+    }
+
+    .confidence-high { background: var(--accent-dim); color: var(--accent); }
+    .confidence-medium { background: #78350f; color: var(--warning); }
+    .confidence-low { background: #7f1d1d; color: var(--danger); }
+
+    .meal-items-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .item-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 12px;
+      background: var(--bg-card);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .item-row:hover {
+      background: var(--border);
+    }
+
+    .item-row.editing {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 8px;
+      cursor: default;
+    }
+
+    .item-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .item-name {
+      font-size: 0.9rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .item-portion {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+    }
+
+    .item-cals {
+      font-size: 0.9rem;
+      font-variant-numeric: tabular-nums;
+      font-weight: 500;
+      color: var(--text-secondary);
+      white-space: nowrap;
+      margin-left: 12px;
+    }
+
+    .edit-form {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .edit-input {
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 12px;
+      color: var(--text-primary);
+      font-size: 0.9rem;
+      width: 100%;
+    }
+
+    .edit-input:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    .edit-actions {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+
+    .edit-btn {
+      padding: 6px 16px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+    }
+
+    .edit-btn.save {
+      background: var(--accent);
+      color: #000;
+    }
+
+    .edit-btn.cancel {
+      background: var(--border);
+      color: var(--text-primary);
+    }
+
+    .delete-btn {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 1.25rem;
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 4px;
+      transition: all 0.2s;
+    }
+
+    .delete-btn:hover {
+      color: var(--danger);
+      background: rgba(239, 68, 68, 0.1);
+    }
+
+    .scan-button {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--accent);
+      color: #000;
+      border: none;
+      padding: 16px 48px;
+      border-radius: 50px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 4px 24px rgba(34, 197, 94, 0.4);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .scan-button:active {
+      transform: translateX(-50%) scale(0.95);
+    }
+
+    .scan-button:disabled {
+      background: var(--text-secondary);
+      box-shadow: none;
+    }
+
+    #file-input {
+      display: none;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: var(--text-secondary);
+    }
+
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 16px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--text-secondary);
+    }
+
+    .empty-state-icon {
+      font-size: 3rem;
+      margin-bottom: 16px;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 100px;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background: var(--bg-elevated);
+      color: var(--text-primary);
+      padding: 12px 24px;
+      border-radius: 8px;
+      opacity: 0;
+      transition: all 0.3s;
+      z-index: 100;
+    }
+
+    .toast.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+
+    .toast.error {
+      background: var(--danger);
+    }
+
+    .edit-hint {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      text-align: center;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Forensic Nutrition</h1>
+    <div class="date" id="current-date"></div>
+  </div>
+
+  <div class="card" id="summary-card">
+    <div class="card-title">Today's Range</div>
+    <div class="calorie-display">
+      <span class="calorie-range calorie-low" id="total-low">0</span>
+      <span class="calorie-separator">—</span>
+      <span class="calorie-range calorie-high" id="total-high">0</span>
+      <span class="calorie-unit">kcal</span>
+    </div>
+    <div class="macros-row">
+      <div class="macro-item">
+        <span class="macro-value macro-protein" id="total-protein">0</span>
+        <span class="macro-label">Protein</span>
+      </div>
+      <div class="macro-item">
+        <span class="macro-value macro-carbs" id="total-carbs">0</span>
+        <span class="macro-label">Carbs</span>
+      </div>
+      <div class="macro-item">
+        <span class="macro-value macro-sugar" id="total-sugar">0</span>
+        <span class="macro-label">Sugar</span>
+      </div>
+      <div class="macro-item">
+        <span class="macro-value macro-fat" id="total-fat">0</span>
+        <span class="macro-label">Fat</span>
+      </div>
+    </div>
+    <div class="meals-count" id="meals-count">No meals logged</div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Today's Meals</div>
+    <div id="meal-list" class="meal-list">
+      <div class="empty-state">
+        <div class="empty-state-icon">📷</div>
+        <p>Scan your first meal to get started</p>
+      </div>
+    </div>
+  </div>
+
+  <input type="file" id="file-input" accept="image/*" capture="environment">
+  <button class="scan-button" id="scan-btn">SCAN MEAL</button>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
