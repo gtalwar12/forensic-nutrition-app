@@ -306,3 +306,22 @@ function showToast(message, isError = false) {
     toast.className = 'toast';
   }, 3000);
 }
+
+// Offline detection
+const offlineIndicator = document.getElementById('offline-indicator');
+
+function updateOnlineStatus() {
+  if (navigator.onLine) {
+    offlineIndicator.classList.remove('show');
+    scanBtn.disabled = false;
+  } else {
+    offlineIndicator.classList.add('show');
+    scanBtn.disabled = true;
+  }
+}
+
+window.addEventListener('online', updateOnlineStatus);
+window.addEventListener('offline', updateOnlineStatus);
+
+// Check initial status
+updateOnlineStatus();

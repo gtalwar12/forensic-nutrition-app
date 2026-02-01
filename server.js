@@ -71,6 +71,27 @@ db.serialize(() => {
       notes TEXT
     )
   `);
+
+  // Profile table
+  db.run(`
+    CREATE TABLE IF NOT EXISTS profile (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      name TEXT,
+      age INTEGER,
+      gender TEXT,
+      current_weight REAL,
+      target_weight REAL,
+      weight_unit TEXT DEFAULT 'lbs',
+      activity_level TEXT DEFAULT 'medium',
+      glp1_usage INTEGER DEFAULT 0,
+      glp1_type TEXT,
+      cal_target INTEGER,
+      protein_target INTEGER,
+      carbs_target INTEGER,
+      fat_target INTEGER,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
 });
 
 // ============================================================
@@ -559,6 +580,297 @@ app.get('/history', (req, res) => {
   );
 });
 
+app.get('/meals/:date', (req, res) => {
+  const { date } = req.params;
+
+  db.all(
+    `SELECT * FROM meals WHERE date(timestamp) = date(?) ORDER BY timestamp ASC`,
+    [date],
+    (err, rows) => {
+      if (err) return res.status(500).json({ error: err.message });
+
+      const meals = rows.map(row => ({
+        id: row.id,
+        time: row.timestamp,
+        items: JSON.parse(row.items || '[]'),
+        cal_low: row.cal_low,
+        cal_high: row.cal_high,
+        protein_g: row.protein_g || 0,
+        carbs_g: row.carbs_g || 0,
+        sugar_g: row.sugar_g || 0,
+        fat_g: row.fat_g || 0,
+        confidence: row.confidence
+      }));
+
+      const totals = meals.reduce((acc, m) => ({
+        cal_low: acc.cal_low + m.cal_low,
+        cal_high: acc.cal_high + m.cal_high,
+        protein_g: acc.protein_g + m.protein_g,
+        carbs_g: acc.carbs_g + m.carbs_g,
+        sugar_g: acc.sugar_g + m.sugar_g,
+        fat_g: acc.fat_g + m.fat_g
+      }), { cal_low: 0, cal_high: 0, protein_g: 0, carbs_g: 0, sugar_g: 0, fat_g: 0 });
+
+      res.json({ date, meals, totals });
+    }
+  );
+});
+
+// ============================================================
+// Profile Endpoints
+// ============================================================
+
+app.get('/profile', (req, res) => {
+  db.get('SELECT * FROM profile WHERE id = 1', (err, row) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(row || {});
+  });
+});
+
+app.post('/profile', async (req, res) => {
+  const { name, age, gender, current_weight, target_weight, weight_unit, activity_level, glp1_usage, glp1_type } = req.body;
+
+  // Calculate recommended targets using AI
+  let recommendations = null;
+  try {
+    recommendations = await calculateRecommendations(req.body);
+  } catch (e) {
+    console.error('AI recommendation error:', e);
+  }
+
+  const cal_target = req.body.cal_target || recommendations?.cal_target || 2000;
+  const protein_target = req.body.protein_target || recommendations?.protein_target || 120;
+  const carbs_target = req.body.carbs_target || recommendations?.carbs_target || 200;
+  const fat_target = req.body.fat_target || recommendations?.fat_target || 65;
+
+  db.run(
+    `INSERT INTO profile (id, name, age, gender, current_weight, target_weight, weight_unit, activity_level, glp1_usage, glp1_type, cal_target, protein_target, carbs_target, fat_target, updated_at)
+     VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+     ON CONFLICT(id) DO UPDATE SET
+       name = excluded.name,
+       age = excluded.age,
+       gender = excluded.gender,
+       current_weight = excluded.current_weight,
+       target_weight = excluded.target_weight,
+       weight_unit = excluded.weight_unit,
+       activity_level = excluded.activity_level,
+       glp1_usage = excluded.glp1_usage,
+       glp1_type = excluded.glp1_type,
+       cal_target = excluded.cal_target,
+       protein_target = excluded.protein_target,
+       carbs_target = excluded.carbs_target,
+       fat_target = excluded.fat_target,
+       updated_at = excluded.updated_at`,
+    [name, age, gender, current_weight, target_weight, weight_unit || 'lbs', activity_level, glp1_usage ? 1 : 0, glp1_type, cal_target, protein_target, carbs_target, fat_target],
+    function(err) {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ success: true, recommendations, cal_target, protein_target, carbs_target, fat_target });
+    }
+  );
+});
+
+app.post('/profile/generate-targets', async (req, res) => {
+  try {
+    const recommendations = await calculateRecommendations(req.body);
+    res.json(recommendations);
+  } catch (error) {
+    console.error('AI recommendation error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+async function calculateRecommendations(profile) {
+  const { age, gender, current_weight, target_weight, weight_unit, activity_level, glp1_usage, glp1_type } = profile;
+
+  const prompt = `You are a nutrition expert. Calculate recommended daily calorie and macro targets.
+
+Profile:
+- Age: ${age || 'unknown'}
+- Gender: ${gender || 'unknown'}
+- Current weight: ${current_weight || 'unknown'} ${weight_unit || 'lbs'}
+- Target weight: ${target_weight || 'unknown'} ${weight_unit || 'lbs'}
+- Activity level: ${activity_level || 'medium'} (none/low/medium/high)
+- GLP-1 medication: ${glp1_usage ? `Yes (${glp1_type || 'unspecified'})` : 'No'}
+
+${glp1_usage ? 'Note: GLP-1 users typically need 20-30% fewer calories but higher protein (1.0-1.2g per lb of target weight) to preserve muscle mass.' : ''}
+
+Return ONLY valid JSON with these exact keys:
+{
+  "cal_target": <number>,
+  "protein_target": <number in grams>,
+  "carbs_target": <number in grams>,
+  "fat_target": <number in grams>,
+  "reasoning": "<brief explanation>"
+}`;
+
+  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+      'Content-Type': 'application/json',
+      'HTTP-Referer': 'http://localhost:3000',
+      'X-Title': 'FNA'
+    },
+    body: JSON.stringify({
+      model: 'anthropic/claude-3-haiku',
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 300
+    })
+  });
+
+  if (!response.ok) throw new Error('AI API error');
+
+  const data = await response.json();
+  let content = data.choices[0].message.content;
+  const jsonMatch = content.match(/\{[\s\S]*\}/);
+  if (jsonMatch) content = jsonMatch[0];
+
+  return JSON.parse(content);
+}
+
+// ============================================================
+// AI Summary Endpoint
+// ============================================================
+
+app.get('/ai-summary', async (req, res) => {
+  try {
+    // Get profile for context
+    const profile = await new Promise((resolve, reject) => {
+      db.get('SELECT * FROM profile WHERE id = 1', (err, row) => {
+        if (err) reject(err);
+        else resolve(row || {});
+      });
+    });
+
+    // Get last 24 hours of meals
+    const meals24h = await new Promise((resolve, reject) => {
+      db.all(
+        `SELECT * FROM meals WHERE timestamp >= datetime('now', '-24 hours') ORDER BY timestamp DESC`,
+        (err, rows) => {
+          if (err) reject(err);
+          else resolve(rows || []);
+        }
+      );
+    });
+
+    // Get last 7 days of meals
+    const meals7d = await new Promise((resolve, reject) => {
+      db.all(
+        `SELECT * FROM meals WHERE timestamp >= datetime('now', '-7 days') ORDER BY timestamp DESC`,
+        (err, rows) => {
+          if (err) reject(err);
+          else resolve(rows || []);
+        }
+      );
+    });
+
+    // Parse items from meals
+    const parse24h = meals24h.map(m => ({
+      time: m.timestamp,
+      items: JSON.parse(m.items || '[]'),
+      cal_low: m.cal_low,
+      cal_high: m.cal_high,
+      protein_g: m.protein_g,
+      carbs_g: m.carbs_g,
+      fat_g: m.fat_g
+    }));
+
+    const totals24h = meals24h.reduce((acc, m) => ({
+      cal_low: acc.cal_low + (m.cal_low || 0),
+      cal_high: acc.cal_high + (m.cal_high || 0),
+      protein_g: acc.protein_g + (m.protein_g || 0),
+      carbs_g: acc.carbs_g + (m.carbs_g || 0),
+      fat_g: acc.fat_g + (m.fat_g || 0)
+    }), { cal_low: 0, cal_high: 0, protein_g: 0, carbs_g: 0, fat_g: 0 });
+
+    const totals7d = meals7d.reduce((acc, m) => ({
+      cal_low: acc.cal_low + (m.cal_low || 0),
+      cal_high: acc.cal_high + (m.cal_high || 0),
+      protein_g: acc.protein_g + (m.protein_g || 0),
+      carbs_g: acc.carbs_g + (m.carbs_g || 0),
+      fat_g: acc.fat_g + (m.fat_g || 0)
+    }), { cal_low: 0, cal_high: 0, protein_g: 0, carbs_g: 0, fat_g: 0 });
+
+    // Build all food items for context
+    const allItems24h = parse24h.flatMap(m => m.items.map(i => i.name)).join(', ');
+    const allItems7d = meals7d.flatMap(m => JSON.parse(m.items || '[]').map(i => i.name)).join(', ');
+
+    const prompt = `You are a supportive nutrition coach. Analyze this eating data and provide helpful, encouraging feedback.
+
+USER PROFILE:
+${profile.name ? `Name: ${profile.name}` : ''}
+${profile.glp1_usage ? `On GLP-1 medication (${profile.glp1_type || 'type unknown'}) - prioritize protein intake` : ''}
+Daily targets: ${profile.cal_target || 2000} cal, ${profile.protein_target || 120}g protein, ${profile.carbs_target || 200}g carbs, ${profile.fat_target || 65}g fat
+
+LAST 24 HOURS:
+- Meals: ${meals24h.length}
+- Calories: ${totals24h.cal_low}-${totals24h.cal_high}
+- Protein: ${totals24h.protein_g}g | Carbs: ${totals24h.carbs_g}g | Fat: ${totals24h.fat_g}g
+- Foods eaten: ${allItems24h || 'none logged'}
+
+LAST 7 DAYS:
+- Total meals: ${meals7d.length}
+- Avg daily calories: ${Math.round(totals7d.cal_low / 7)}-${Math.round(totals7d.cal_high / 7)}
+- Avg daily protein: ${Math.round(totals7d.protein_g / 7)}g
+- Foods eaten: ${allItems7d || 'none logged'}
+
+Provide a JSON response with:
+{
+  "summary_24h": {
+    "headline": "<short encouraging headline>",
+    "nutrition_quality": "<assessment of nutritional value>",
+    "protein_status": "<are they hitting protein goals? important for GLP-1 users>",
+    "portion_insight": "<observation about portions>",
+    "suggestion": "<one actionable tip>"
+  },
+  "summary_7d": {
+    "headline": "<week overview headline>",
+    "patterns": "<eating patterns observed>",
+    "wins": "<positive behaviors to celebrate>",
+    "focus_area": "<one area to improve>",
+    "encouragement": "<supportive closing message>"
+  }
+}
+
+Be warm, specific, and constructive. Focus on progress, not perfection.`;
+
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'http://localhost:3000',
+        'X-Title': 'FNA'
+      },
+      body: JSON.stringify({
+        model: 'anthropic/claude-3-haiku',
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 600
+      })
+    });
+
+    if (!response.ok) throw new Error('AI API error');
+
+    const data = await response.json();
+    let content = data.choices[0].message.content;
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (jsonMatch) content = jsonMatch[0];
+
+    const summary = JSON.parse(content);
+    res.json({
+      ...summary,
+      totals_24h: totals24h,
+      totals_7d: totals7d,
+      meals_24h: meals24h.length,
+      meals_7d: meals7d.length
+    });
+
+  } catch (error) {
+    console.error('AI summary error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.delete('/meal/:id', (req, res) => {
   db.run('DELETE FROM meals WHERE id = ?', [req.params.id], function(err) {
     if (err) return res.status(500).json({ error: err.message });
@@ -567,7 +879,7 @@ app.delete('/meal/:id', (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`🍽️  Forensic Nutrition PWA running on http://localhost:${PORT}`);
+  console.log(`🍽️  FNA running on http://localhost:${PORT}`);
   console.log(`   Two-stage analysis: Haiku identify → USDA lookup → Haiku estimate`);
   if (!process.env.USDA_API_KEY) {
     console.log('⚠️  No USDA_API_KEY - all estimates via AI');

@@ -6,7 +6,16 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="theme-color" content="#0a0a0a">
-  <title>Forensic Nutrition</title>
+  <meta name="description" content="AI-powered food photo analysis with USDA nutrition data">
+
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="/manifest.json">
+
+  <!-- Icons -->
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+
+  <title>FNA</title>
   <style>
     :root {
       --bg-primary: #0a0a0a;
@@ -414,50 +423,726 @@
       text-align: center;
       margin-top: 8px;
     }
+
+    /* Tab Navigation */
+    .tab-nav {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+      background: var(--bg-card);
+      padding: 6px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 12px 16px;
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 0.875rem;
+      font-weight: 500;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .tab-btn.active {
+      background: var(--accent);
+      color: #000;
+    }
+
+    .tab-btn:not(.active):hover {
+      background: var(--bg-elevated);
+      color: var(--text-primary);
+    }
+
+    .tab-panel {
+      display: none;
+    }
+
+    .tab-panel.active {
+      display: block;
+    }
+
+    /* Charts tab specific */
+    .history-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .history-day {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 16px;
+      background: var(--bg-elevated);
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .history-day:hover {
+      background: var(--border);
+    }
+
+    .history-day::after {
+      content: '›';
+      color: var(--text-muted);
+      font-size: 1.25rem;
+      margin-left: 8px;
+    }
+
+    .history-date {
+      font-size: 0.875rem;
+      color: var(--text-primary);
+    }
+
+    .history-date-sub {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+    }
+
+    .history-cals {
+      text-align: right;
+    }
+
+    .history-range {
+      font-size: 1rem;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .history-meals {
+      font-size: 0.7rem;
+      color: var(--text-secondary);
+    }
+
+    /* Day Detail View */
+    .day-detail {
+      display: none;
+    }
+
+    .day-detail.active {
+      display: block;
+    }
+
+    .back-btn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: none;
+      border: none;
+      color: var(--accent);
+      font-size: 0.875rem;
+      cursor: pointer;
+      padding: 8px 0;
+      margin-bottom: 12px;
+    }
+
+    .back-btn:hover {
+      text-decoration: underline;
+    }
+
+    .day-detail-header {
+      margin-bottom: 16px;
+    }
+
+    .day-detail-title {
+      font-size: 1.25rem;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .day-detail-summary {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      color: var(--text-secondary);
+      font-size: 0.875rem;
+    }
+
+    .day-detail-meals {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .detail-meal {
+      background: var(--bg-elevated);
+      border-radius: 12px;
+      padding: 16px;
+    }
+
+    .detail-meal-time {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+    }
+
+    .detail-meal-cals {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 12px;
+    }
+
+    .detail-meal-items {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .detail-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 12px;
+      background: var(--bg-card);
+      border-radius: 6px;
+      font-size: 0.85rem;
+    }
+
+    .detail-item-name {
+      flex: 1;
+    }
+
+    .detail-item-portion {
+      color: var(--text-secondary);
+      margin-left: 8px;
+    }
+
+    .detail-item-cals {
+      color: var(--text-secondary);
+      margin-left: 12px;
+      white-space: nowrap;
+    }
+
+    /* Profile Tab */
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+    }
+
+    .form-input {
+      width: 100%;
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      color: var(--text-primary);
+      font-size: 1rem;
+    }
+
+    .form-input:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    .form-row {
+      display: flex;
+      gap: 12px;
+    }
+
+    .form-row .form-group {
+      flex: 1;
+    }
+
+    .form-select {
+      width: 100%;
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      color: var(--text-primary);
+      font-size: 1rem;
+      cursor: pointer;
+    }
+
+    .toggle-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 0;
+    }
+
+    .toggle-label {
+      font-size: 0.9rem;
+    }
+
+    .toggle-switch {
+      width: 50px;
+      height: 28px;
+      background: var(--border);
+      border-radius: 14px;
+      position: relative;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .toggle-switch.active {
+      background: var(--accent);
+    }
+
+    .toggle-switch::after {
+      content: '';
+      position: absolute;
+      width: 22px;
+      height: 22px;
+      background: white;
+      border-radius: 50%;
+      top: 3px;
+      left: 3px;
+      transition: transform 0.2s;
+    }
+
+    .toggle-switch.active::after {
+      transform: translateX(22px);
+    }
+
+    .targets-card {
+      background: var(--bg-elevated);
+      border-radius: 12px;
+      padding: 16px;
+      margin-top: 16px;
+    }
+
+    .targets-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .targets-title {
+      font-size: 0.875rem;
+      font-weight: 600;
+    }
+
+    .generate-btn {
+      background: var(--accent);
+      color: #000;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 500;
+      cursor: pointer;
+    }
+
+    .generate-btn:disabled {
+      background: var(--border);
+      color: var(--text-secondary);
+    }
+
+    .target-inputs {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+
+    .target-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .target-item label {
+      font-size: 0.7rem;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+    }
+
+    .target-item input {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px;
+      color: var(--text-primary);
+      font-size: 0.9rem;
+      width: 100%;
+    }
+
+    .save-profile-btn {
+      width: 100%;
+      background: var(--accent);
+      color: #000;
+      border: none;
+      padding: 14px;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 20px;
+    }
+
+    .save-profile-btn:disabled {
+      background: var(--border);
+      color: var(--text-secondary);
+    }
+
+    /* Summary Tab */
+    .summary-section {
+      margin-bottom: 20px;
+    }
+
+    .summary-period {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--accent);
+      margin-bottom: 12px;
+    }
+
+    .summary-headline {
+      font-size: 1.25rem;
+      font-weight: 600;
+      margin-bottom: 16px;
+      line-height: 1.3;
+    }
+
+    .summary-stats {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+      padding: 12px;
+      background: var(--bg-elevated);
+      border-radius: 8px;
+    }
+
+    .summary-stat {
+      text-align: center;
+    }
+
+    .summary-stat-value {
+      font-size: 1.1rem;
+      font-weight: 600;
+    }
+
+    .summary-stat-label {
+      font-size: 0.65rem;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+    }
+
+    .summary-content {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .summary-item {
+      padding: 12px;
+      background: var(--bg-elevated);
+      border-radius: 8px;
+    }
+
+    .summary-item-label {
+      font-size: 0.7rem;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    .summary-item-text {
+      font-size: 0.9rem;
+      line-height: 1.4;
+    }
+
+    .loading-summary {
+      text-align: center;
+      padding: 40px;
+      color: var(--text-secondary);
+    }
+
+    .refresh-btn {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      margin-top: 16px;
+    }
+
+    .refresh-btn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* PWA Update Banner */
+    .update-banner {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      background: var(--accent);
+      color: #000;
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      font-size: 0.875rem;
+      font-weight: 500;
+      transform: translateY(-100%);
+      transition: transform 0.3s ease;
+      z-index: 1000;
+    }
+
+    .update-banner.show {
+      transform: translateY(0);
+    }
+
+    .update-banner button {
+      background: #000;
+      color: #fff;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .update-banner button.dismiss {
+      background: transparent;
+      color: #000;
+      padding: 4px 8px;
+      font-size: 1.25rem;
+      line-height: 1;
+    }
+
+    /* Offline indicator */
+    .offline-indicator {
+      position: fixed;
+      bottom: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--warning);
+      color: #000;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 500;
+      display: none;
+      z-index: 99;
+    }
+
+    .offline-indicator.show {
+      display: block;
+    }
   </style>
 </head>
 <body>
   <div class="header">
-    <h1>Forensic Nutrition</h1>
+    <h1>FNA</h1>
     <div class="date" id="current-date"></div>
   </div>
 
-  <div class="card" id="summary-card">
-    <div class="card-title">Today's Range</div>
-    <div class="calorie-display">
-      <span class="calorie-range calorie-low" id="total-low">0</span>
-      <span class="calorie-separator">—</span>
-      <span class="calorie-range calorie-high" id="total-high">0</span>
-      <span class="calorie-unit">kcal</span>
-    </div>
-    <div class="macros-row">
-      <div class="macro-item">
-        <span class="macro-value macro-protein" id="total-protein">0</span>
-        <span class="macro-label">Protein</span>
-      </div>
-      <div class="macro-item">
-        <span class="macro-value macro-carbs" id="total-carbs">0</span>
-        <span class="macro-label">Carbs</span>
-      </div>
-      <div class="macro-item">
-        <span class="macro-value macro-sugar" id="total-sugar">0</span>
-        <span class="macro-label">Sugar</span>
-      </div>
-      <div class="macro-item">
-        <span class="macro-value macro-fat" id="total-fat">0</span>
-        <span class="macro-label">Fat</span>
-      </div>
-    </div>
-    <div class="meals-count" id="meals-count">No meals logged</div>
+  <!-- Tab Navigation -->
+  <div class="tab-nav">
+    <button class="tab-btn active" data-tab="today">Today</button>
+    <button class="tab-btn" data-tab="charts">Charts</button>
+    <button class="tab-btn" data-tab="summary">Summary</button>
+    <button class="tab-btn" data-tab="profile">Profile</button>
   </div>
 
-  <div class="card">
-    <div class="card-title">Today's Meals</div>
-    <div id="meal-list" class="meal-list">
-      <div class="empty-state">
-        <div class="empty-state-icon">📷</div>
-        <p>Scan your first meal to get started</p>
+  <!-- Today Tab -->
+  <div id="tab-today" class="tab-panel active">
+    <div class="card" id="summary-card">
+      <div class="card-title">Today's Range</div>
+      <div class="calorie-display">
+        <span class="calorie-range calorie-low" id="total-low">0</span>
+        <span class="calorie-separator">—</span>
+        <span class="calorie-range calorie-high" id="total-high">0</span>
+        <span class="calorie-unit">kcal</span>
       </div>
+      <div class="macros-row">
+        <div class="macro-item">
+          <span class="macro-value macro-protein" id="total-protein">0</span>
+          <span class="macro-label">Protein</span>
+        </div>
+        <div class="macro-item">
+          <span class="macro-value macro-carbs" id="total-carbs">0</span>
+          <span class="macro-label">Carbs</span>
+        </div>
+        <div class="macro-item">
+          <span class="macro-value macro-sugar" id="total-sugar">0</span>
+          <span class="macro-label">Sugar</span>
+        </div>
+        <div class="macro-item">
+          <span class="macro-value macro-fat" id="total-fat">0</span>
+          <span class="macro-label">Fat</span>
+        </div>
+      </div>
+      <div class="meals-count" id="meals-count">No meals logged</div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Today's Meals</div>
+      <div id="meal-list" class="meal-list">
+        <div class="empty-state">
+          <div class="empty-state-icon">📷</div>
+          <p>Scan your first meal to get started</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Charts Tab -->
+  <div id="tab-charts" class="tab-panel">
+    <div class="card">
+      <div class="card-title">7-Day Calorie Corridor</div>
+      <div class="chart-container" style="height: 200px; position: relative;">
+        <canvas id="calorie-chart"></canvas>
+      </div>
+    </div>
+
+    <div class="card" id="history-card">
+      <div class="card-title">Daily History</div>
+      <div id="history-list" class="history-list">
+        <div class="empty-state">
+          <p>Loading history...</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Day Detail View -->
+    <div id="day-detail" class="day-detail">
+      <button class="back-btn" onclick="hideDayDetail()">← Back to History</button>
+      <div class="card">
+        <div class="day-detail-header">
+          <div class="day-detail-title" id="detail-title">Sunday, Jan 26</div>
+          <div class="day-detail-summary" id="detail-summary"></div>
+        </div>
+        <div class="day-detail-meals" id="detail-meals"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Summary Tab -->
+  <div id="tab-summary" class="tab-panel">
+    <div class="card">
+      <div id="summary-content" class="loading-summary">
+        <div class="spinner"></div>
+        <p>Click to generate AI summary...</p>
+        <button class="refresh-btn" onclick="loadAISummary()">Generate Summary</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Profile Tab -->
+  <div id="tab-profile" class="tab-panel">
+    <div class="card">
+      <div class="card-title">Your Profile</div>
+
+      <div class="form-group">
+        <label class="form-label">Name</label>
+        <input type="text" id="profile-name" class="form-input" placeholder="Your name">
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Age</label>
+          <input type="number" id="profile-age" class="form-input" placeholder="30">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Gender</label>
+          <select id="profile-gender" class="form-select">
+            <option value="">Select...</option>
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Current Weight</label>
+          <input type="number" id="profile-current-weight" class="form-input" placeholder="180">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Target Weight</label>
+          <input type="number" id="profile-target-weight" class="form-input" placeholder="165">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Weight Unit</label>
+        <select id="profile-weight-unit" class="form-select">
+          <option value="lbs">Pounds (lbs)</option>
+          <option value="kg">Kilograms (kg)</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Activity Level</label>
+        <select id="profile-activity" class="form-select">
+          <option value="none">None (sedentary)</option>
+          <option value="low">Low (light exercise 1-2x/week)</option>
+          <option value="medium" selected>Medium (moderate exercise 3-4x/week)</option>
+          <option value="high">High (intense exercise 5+x/week)</option>
+        </select>
+      </div>
+
+      <div class="toggle-row">
+        <span class="toggle-label">Using GLP-1 Medication?</span>
+        <div id="glp1-toggle" class="toggle-switch" onclick="toggleGlp1()"></div>
+      </div>
+
+      <div id="glp1-type-group" class="form-group" style="display: none;">
+        <label class="form-label">GLP-1 Type</label>
+        <select id="profile-glp1-type" class="form-select">
+          <option value="">Select medication...</option>
+          <option value="ozempic">Ozempic (semaglutide)</option>
+          <option value="wegovy">Wegovy (semaglutide)</option>
+          <option value="mounjaro">Mounjaro (tirzepatide)</option>
+          <option value="zepbound">Zepbound (tirzepatide)</option>
+          <option value="saxenda">Saxenda (liraglutide)</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+
+      <div class="targets-card">
+        <div class="targets-header">
+          <span class="targets-title">Daily Targets</span>
+          <button class="generate-btn" id="generate-targets-btn" onclick="generateTargets()">AI Generate</button>
+        </div>
+        <div id="ai-reasoning" style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 12px; display: none;"></div>
+        <div class="target-inputs">
+          <div class="target-item">
+            <label>Calories</label>
+            <input type="number" id="target-calories" placeholder="2000">
+          </div>
+          <div class="target-item">
+            <label>Protein (g)</label>
+            <input type="number" id="target-protein" placeholder="120">
+          </div>
+          <div class="target-item">
+            <label>Carbs (g)</label>
+            <input type="number" id="target-carbs" placeholder="200">
+          </div>
+          <div class="target-item">
+            <label>Fat (g)</label>
+            <input type="number" id="target-fat" placeholder="65">
+          </div>
+        </div>
+      </div>
+
+      <button class="save-profile-btn" onclick="saveProfile()">Save Profile</button>
     </div>
   </div>
 
@@ -465,7 +1150,78 @@
   <button class="scan-button" id="scan-btn">SCAN MEAL</button>
 
   <div class="toast" id="toast"></div>
+  <div class="offline-indicator" id="offline-indicator">You're offline</div>
 
+  <!-- Update notification banner -->
+  <div class="update-banner" id="update-banner">
+    <span>A new version is available</span>
+    <button onclick="applyUpdate()">Update Now</button>
+    <button class="dismiss" onclick="dismissUpdate()">×</button>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="charts.js"></script>
+  <script src="profile.js"></script>
   <script src="app.js"></script>
+
+  <!-- Service Worker Registration -->
+  <script>
+    // Store reference to waiting service worker
+    let waitingWorker = null;
+
+    // Register service worker
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', async () => {
+        try {
+          const registration = await navigator.serviceWorker.register('/sw.js');
+          console.log('[App] Service worker registered:', registration.scope);
+
+          // Check for updates
+          registration.addEventListener('updatefound', () => {
+            const newWorker = registration.installing;
+            console.log('[App] New service worker installing...');
+
+            newWorker.addEventListener('statechange', () => {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                // New version available
+                console.log('[App] New version available');
+                waitingWorker = newWorker;
+                showUpdateBanner();
+              }
+            });
+          });
+
+          // Handle controller change (new SW activated)
+          navigator.serviceWorker.addEventListener('controllerchange', () => {
+            console.log('[App] Controller changed, reloading...');
+            window.location.reload();
+          });
+
+        } catch (error) {
+          console.error('[App] Service worker registration failed:', error);
+        }
+      });
+    }
+
+    // Show update notification banner
+    function showUpdateBanner() {
+      const banner = document.getElementById('update-banner');
+      banner.classList.add('show');
+    }
+
+    // Apply the update
+    function applyUpdate() {
+      if (waitingWorker) {
+        waitingWorker.postMessage('skipWaiting');
+      }
+      dismissUpdate();
+    }
+
+    // Dismiss the update banner
+    function dismissUpdate() {
+      const banner = document.getElementById('update-banner');
+      banner.classList.remove('show');
+    }
+  </script>
 </body>
 </html>
